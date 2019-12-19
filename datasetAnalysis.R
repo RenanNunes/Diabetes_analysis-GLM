@@ -25,6 +25,9 @@ corrplot(cor_matrix, type = "upper", order = "hclust",
          tl.col = "black", tl.srt = 45)
 # the most correlated variables are: SGLU and GHB; H and WHT; H and W (0.83455575 - biggest one); SBP and DSP
 
+# boxplots
+boxplot(data[nums], use.cols=TRUE)
+
 # bmi calculation (with lbs and inches)
 data$BMI = 703 * data$WHT / (data$HHT*data$HHT)
 # adding BMI classification
@@ -39,7 +42,7 @@ data$AGE_CAT <- cut(data$AGE, breaks = c(17,25,35,45,55,65,200), labels=c("18-25
 # summary with the created columns added
 summary(data)
 
-# chi square tests
+# chi square tests for a preliminar analysis
 # diabetes x bmi_cat
 test_bmi_cat = table(data$DIABETES, data$BMI_CAT)
 test_bmi_cat
@@ -82,10 +85,9 @@ plot(data$HDL, data$GHB, main="Glycosolated Hemoglobin x  High Density Lipoprote
 hist(data$GHB, xlab = "GHB", main = "Histogram of GHB", freq = FALSE, breaks = 50)
 library(MASS)
 fit.params <- fitdistr(data$GHB, "gamma", lower = c(0, 0))
-fit.params
-curve(dgamma(x=x, shape=8.8312777, rate=1.5799002), col="blue", add=TRUE)
-
-
+curve(dgamma(x=x, shape=fit.params$estimate['shape'], rate=fit.params$estimate['rate']), col="blue", add=TRUE)
+fit.params <- fitdistr(data$GHB, "weibull", lower = c(0, 0))
+curve(dweibull(x=x, shape=fit.params$estimate['shape'], scale=fit.params$estimate['scale']), col="green", add=TRUE)
 
 # Generalized linear model (without using prior)
 glm_ghb <- glm(GHB ~ CHOL + SGLU + HDL + AGE + SBP + DSP + BMI + W + H, data=data, family=Gamma(link="inverse"))
@@ -99,3 +101,40 @@ confint(glm_ghb_2)
 # anova test removing a variable that is important to check the result
 glm_ghb_3 <- glm(GHB ~ SGLU + HDL + AGE + SBP + DSP + BMI + W + H, data=data, family=Gamma(link="inverse"))
 anova(glm_ghb, glm_ghb_3, test = "Chisq")
+
+# glm with prior
+library("rjags")
+set.seed(5)
+# note: dgamma in JAGS = dgamma(shape, rate)
+# inverse link
+mod1_string = " model {
+    for (i in 1:length(y)) {
+      y[i] ~ dgamma(shape, shape * inv_mu[i])
+      inv_mu[i] = (b[1] + b[2]*CHOL[i] + b[3]*SGLU[i] + b[4]*HDL[i] + b[5]*AGE[i] + b[6]*SBP[i] + b[7]*DSP[i] + b[8]*BMI[i])
+    }
+    b[1] ~ dnorm(0.5, 1.0/1.0e4)
+    for (j in 2:8) {
+      b[j] ~ dnorm(0.0, 1.0/1.0e4)
+    }
+    shape ~ dgamma(0.001, 0.001)
+} "
+params = c("shape", "b")
+
+# normalization
+library(dplyr)
+columns_models <- select(data, "CHOL", "SGLU", "HDL", "AGE", "SBP", "DSP", "BMI")
+scaled_data <- scale(columns_models)
+
+data_jags = list(y=data$GHB, CHOL=scaled_data[,"CHOL"], SGLU=scaled_data[,"SGLU"], HDL=scaled_data[,"HDL"], AGE=scaled_data[,"AGE"], SBP=scaled_data[,"SBP"], DSP=scaled_data[,"DSP"], BMI=scaled_data[,"BMI"])
+# data_jags = list(y=data$GHB, CHOL=data[,"CHOL"], SGLU=data[,"SGLU"], HDL=data[,"HDL"], AGE=data[,"AGE"], SBP=data[,"SBP"], DSP=data[,"DSP"], BMI=data[,"BMI"])
+
+mod1 = jags.model(textConnection(mod1_string), data=data_jags, n.chains=3)
+update(mod1, 1e3)
+
+mod1_sim = coda.samples(model=mod1,
+                        variable.names=params,
+                        n.iter=5e3)
+mod1_csim = as.mcmc(do.call(rbind, mod1_sim))
+
+summary(mod1_sim)
+
