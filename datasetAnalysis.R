@@ -146,7 +146,7 @@ X = cbind(rep(1.0, nrow(data)), scaled_data[,"CHOL"], scaled_data[,"SGLU"], scal
 (pm_params1 = colMeans(mod1_csim)) #posterior mean
 
 # vector of predicted values from the model
-yhat1 <- drop(X %*% pm_params1[1:8])
+yhat1 <- (drop(X %*% pm_params1[1:8]))^(-1)
 # calculate residuals
 resid1 <- data_jags$y - yhat1
 
@@ -190,7 +190,7 @@ X2 = cbind(rep(1.0, nrow(data)), scaled_data[,"CHOL"], scaled_data[,"SGLU"], sca
 (pm_params2 = colMeans(mod2_csim)) #posterior mean
 
 # vector of predicted values from the model
-yhat2 <- drop(X2 %*% pm_params2[1:7])
+yhat2 <- (drop(X2 %*% pm_params2[1:7]))^(-1)
 # calculate residuals
 resid2 <- data_jags_2$y - yhat2
 
@@ -234,7 +234,7 @@ X3 = cbind(rep(1.0, nrow(data)), scaled_data[,"CHOL"], scaled_data[,"SGLU"], sca
 (pm_params3 = colMeans(mod3_csim)) #posterior mean
 
 # vector of predicted values from the model
-yhat3 <- drop(X3 %*% pm_params3[1:6])
+yhat3 <- (drop(X3 %*% pm_params3[1:6]))^(-1)
 # calculate residuals
 resid3 <- data_jags_3$y - yhat3
 
@@ -245,3 +245,135 @@ summary(mod3_sim)
 
 # DIC
 dic.samples(mod3, n.iter = 1e3)
+
+# model 4
+mod4_string = " model {
+    for (i in 1:length(y)) {
+      y[i] ~ dgamma(shape, shape * inv_mu[i])
+      inv_mu[i] = (b[1] + b[2]*CHOL[i] + b[3]*SGLU[i] + b[4]*AGE[i] + b[5]*BMI[i])
+    }
+    b[1] ~ dnorm(0.5, 1.0/1.0e4)
+    for (j in 2:5) {
+      b[j] ~ dnorm(0.0, 1.0/1.0e4)
+    }
+    shape ~ dgamma(0.001, 0.001)
+} "
+data_jags_4 = list(y=data$GHB, CHOL=scaled_data[,"CHOL"], SGLU=scaled_data[,"SGLU"], AGE=scaled_data[,"AGE"], BMI=scaled_data[,"BMI"])
+
+mod4 = jags.model(textConnection(mod4_string), data=data_jags_4, n.chains=3)
+update(mod4, 1e3)
+
+mod4_sim = coda.samples(model=mod4,
+                        variable.names=params,
+                        n.iter=5e3)
+mod4_csim = as.mcmc(do.call(rbind, mod4_sim))
+
+# convergence
+plot(mod4_sim)
+gelman.diag(mod4_sim)
+heidel.diag(mod4_sim)
+
+# residuals
+X4 = cbind(rep(1.0, nrow(data)), scaled_data[,"CHOL"], scaled_data[,"SGLU"], scaled_data[,"AGE"], scaled_data[,"BMI"])
+(pm_params4 = colMeans(mod4_csim)) #posterior mean
+
+# vector of predicted values from the model
+yhat4 <- (drop(X4 %*% pm_params4[1:5]))^(-1)
+# calculate residuals
+resid4 <- data_jags_4$y - yhat4
+
+plot(resid4)
+
+# summary
+summary(mod4_sim)
+
+# DIC
+dic.samples(mod4, n.iter = 1e3)
+
+# model 5
+mod5_string = " model {
+    for (i in 1:length(y)) {
+      y[i] ~ dgamma(shape, shape * inv_mu[i])
+      inv_mu[i] = (b[1] + b[2]*CHOL[i] + b[3]*SGLU[i] + b[4]*HDL[i] + b[5]*AGE[i])
+    }
+    b[1] ~ dnorm(0.5, 1.0/1.0e4)
+    for (j in 2:5) {
+      b[j] ~ dnorm(0.0, 1.0/1.0e4)
+    }
+    shape ~ dgamma(0.001, 0.001)
+} "
+data_jags_5 = list(y=data$GHB, CHOL=scaled_data[,"CHOL"], SGLU=scaled_data[,"SGLU"], HDL=scaled_data[,"HDL"], AGE=scaled_data[,"AGE"])
+
+mod5 = jags.model(textConnection(mod5_string), data=data_jags_5, n.chains=3)
+update(mod5, 1e3)
+
+mod5_sim = coda.samples(model=mod5,
+                        variable.names=params,
+                        n.iter=5e3)
+mod5_csim = as.mcmc(do.call(rbind, mod5_sim))
+
+# convergence
+plot(mod5_sim)
+gelman.diag(mod5_sim)
+heidel.diag(mod5_sim)
+
+# residuals
+X5 = cbind(rep(1.0, nrow(data)), scaled_data[,"CHOL"], scaled_data[,"SGLU"], scaled_data[,"HDL"], scaled_data[,"AGE"])
+(pm_params5 = colMeans(mod5_csim)) #posterior mean
+
+# vector of predicted values from the model
+yhat5 <- (drop(X5 %*% pm_params5[1:5]))^(-1)
+# calculate residuals
+resid5 <- data_jags_5$y - yhat5
+
+plot(resid5)
+
+# summary
+summary(mod5_sim)
+
+# DIC
+dic.samples(mod5, n.iter = 1e3)
+
+# model 6
+mod6_string = " model {
+    for (i in 1:length(y)) {
+      y[i] ~ dgamma(shape, shape * inv_mu[i])
+      inv_mu[i] = (b[1] + b[2]*CHOL[i] + b[3]*SGLU[i] + b[4]*AGE[i])
+    }
+    b[1] ~ dnorm(0.5, 1.0/1.0e4)
+    for (j in 2:4) {
+      b[j] ~ dnorm(0.0, 1.0/1.0e4)
+    }
+    shape ~ dgamma(0.001, 0.001)
+} "
+data_jags_6 = list(y=data$GHB, CHOL=scaled_data[,"CHOL"], SGLU=scaled_data[,"SGLU"], AGE=scaled_data[,"AGE"])
+
+mod6 = jags.model(textConnection(mod6_string), data=data_jags_6, n.chains=3)
+update(mod6, 1e3)
+
+mod6_sim = coda.samples(model=mod6,
+                        variable.names=params,
+                        n.iter=5e3)
+mod6_csim = as.mcmc(do.call(rbind, mod6_sim))
+
+# convergence
+plot(mod6_sim)
+gelman.diag(mod6_sim)
+heidel.diag(mod6_sim)
+
+# residuals
+X6 = cbind(rep(1.0, nrow(data)), scaled_data[,"CHOL"], scaled_data[,"SGLU"], scaled_data[,"AGE"])
+(pm_params6 = colMeans(mod6_csim)) #posterior mean
+
+# vector of predicted values from the model
+yhat6 <- (drop(X6 %*% pm_params6[1:4]))^(-1)
+# calculate residuals
+resid6 <- data_jags_6$y - yhat6
+
+plot(resid6)
+
+# summary
+summary(mod6_sim)
+
+# DIC
+dic.samples(mod6, n.iter = 1e3)
